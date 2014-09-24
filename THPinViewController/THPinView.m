@@ -26,6 +26,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 
 @property (nonatomic, strong) NSMutableString *input;
 
+@property (nonatomic, assign) BOOL inputVerified;
 @property (nonatomic, strong) NSString *creatingPin;
 
 @end
@@ -156,9 +157,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         return;
     }
     _promptTitle = [promptTitle copy];
-    if (self.viewControllerType == THPinViewControllerTypeStandard) {
-        self.promptLabel.text = self.promptTitle;
-    }
+    self.promptLabel.text = self.promptTitle;
 }
 
 - (void)setPromptChooseTitle:(NSString *)promptChooseTitle
@@ -167,9 +166,6 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         return;
     }
     _promptChooseTitle = [promptChooseTitle copy];
-    if (self.viewControllerType == THPinViewControllerTypeCreatePin) {
-        self.promptLabel.text = self.promptChooseTitle;
-    }
 }
 
 - (void)setPromptVerifyTitle:(NSString *)promptVerifyTitle
@@ -216,7 +212,6 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     _viewControllerType = viewControllerType;
     if (self.viewControllerType == THPinViewControllerTypeCreatePin) {
         NSAssert(self.promptChooseTitle && self.promptVerifyTitle, @"THPinView needs promptChooseTitle and promptVerifyTitle for THPinViewControllerTypeCreatePin");
-        self.promptLabel.text = self.promptChooseTitle;
     }
 }
 
@@ -276,26 +271,37 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     }
     
     if (self.viewControllerType == THPinViewControllerTypeCreatePin) {
-        if ( self.creatingPin == nil) {
+        if(!self.inputVerified) {
+            self.creatingPin = nil;
+            if ([self.delegate pinView:self isPinValid:self.input])
+            {
+                self.inputVerified = YES;
+                [self slideCirclesAndLabelWithLabel:self.promptChooseTitle forward:YES completion:^{
+                    [self resetInput];
+                }];
+            } else {
+                [self.inputCirclesView shakeWithCompletion:^{
+                    [self resetInput];
+                    [self.delegate incorrectPinWasEnteredInPinView:self];
+                }];
+            }
+        } else if (self.creatingPin == nil) {
             self.creatingPin = self.input;
-            [self slideCirclesAndLabelWithCompletion:^{
+            [self slideCirclesAndLabelWithLabel:self.promptVerifyTitle forward:YES completion:^{
                 [self resetInput];
             }];
-            return;
-        }
-        
-        if ([self.creatingPin isEqualToString:self.input]) {
+        } else if ([self.creatingPin isEqualToString:self.input]) {
             double delayInSeconds = 0.3f;
             dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
             dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
                 [self.delegate pin:self.creatingPin wasCreatedInPinView:self];
             });
-            return;
-        }else {
+        } else {
             [self.inputCirclesView shakeWithCompletion:^{
-                [self resetInput];
-                self.promptLabel.text = self.promptChooseTitle;
                 self.creatingPin = nil;
+                [self slideCirclesAndLabelWithLabel:self.promptChooseTitle forward:NO completion:^{
+                    [self resetInput];
+                }];
             }];
         }
         return;
@@ -320,12 +326,12 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 
 #pragma mark - Util
 
-- (void)slideCirclesAndLabelWithCompletion:(THPinAnimationCompletionBlock)completion {
+- (void)slideCirclesAndLabelWithLabel:(NSString *)label forward:(BOOL)forward completion:(THPinAnimationCompletionBlock)completion {
     CABasicAnimation* slideOutAnimation = [CABasicAnimation animationWithKeyPath:@"transform"];
     slideOutAnimation.autoreverses = NO;
     slideOutAnimation.duration = 0.3f;
     slideOutAnimation.beginTime = 0.0f;
-    slideOutAnimation.toValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(-200, 0, 0) ];
+    slideOutAnimation.toValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(forward ? -200 : 200, 0, 0) ];
     slideOutAnimation.removedOnCompletion = NO;
     slideOutAnimation.fillMode = kCAFillModeForwards;
     slideOutAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
@@ -334,7 +340,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     slideInAnimation.autoreverses = NO;
     slideInAnimation.duration = 0.3f;
     slideInAnimation.beginTime = 0.3f;
-    slideInAnimation.fromValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(200, 0, 0) ];
+    slideInAnimation.fromValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(forward ? 200 : -200, 0, 0) ];
     slideInAnimation.toValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(0, 0, 0) ];
     slideInAnimation.removedOnCompletion = NO;
     slideInAnimation.fillMode = kCAFillModeForwards;
@@ -365,7 +371,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     [self.promptLabel.layer addAnimation:slideGroup forKey:@"slideAnimation"];
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(slideGroup.duration/2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        self.promptLabel.text = self.promptVerifyTitle;
+        self.promptLabel.text = label;
     });
     [self.inputCirclesView animateWithAnimation:slideGroup andCompletion:^{
         if (completion) {
