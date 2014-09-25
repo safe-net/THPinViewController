@@ -329,7 +329,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 - (void)slideCirclesAndLabelWithLabel:(NSString *)label forward:(BOOL)forward completion:(THPinAnimationCompletionBlock)completion {
     CABasicAnimation* slideOutAnimation = [CABasicAnimation animationWithKeyPath:@"transform"];
     slideOutAnimation.autoreverses = NO;
-    slideOutAnimation.duration = 0.3f;
+    slideOutAnimation.duration = 0.2f;
     slideOutAnimation.beginTime = 0.0f;
     slideOutAnimation.toValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(forward ? -200 : 200, 0, 0) ];
     slideOutAnimation.removedOnCompletion = NO;
@@ -338,8 +338,8 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     
     CABasicAnimation* slideInAnimation = [CABasicAnimation animationWithKeyPath:@"transform"];
     slideInAnimation.autoreverses = NO;
-    slideInAnimation.duration = 0.3f;
-    slideInAnimation.beginTime = 0.3f;
+    slideInAnimation.duration = 0.2f;
+    slideInAnimation.beginTime = 0.2f;
     slideInAnimation.fromValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(forward ? 200 : -200, 0, 0) ];
     slideInAnimation.toValue = [NSValue valueWithCATransform3D:CATransform3DMakeTranslation(0, 0, 0) ];
     slideInAnimation.removedOnCompletion = NO;
@@ -349,7 +349,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     CABasicAnimation* opacityOutAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
     opacityOutAnimation.autoreverses = NO;
     opacityOutAnimation.toValue = [NSNumber numberWithFloat:0.0];
-    opacityOutAnimation.duration = 0.3f;
+    opacityOutAnimation.duration = 0.2f;
     opacityOutAnimation.beginTime = 0.0f;
     opacityOutAnimation.removedOnCompletion = NO;
     opacityOutAnimation.fillMode = kCAFillModeForwards;
@@ -358,14 +358,14 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     CABasicAnimation* opacityInAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
     opacityInAnimation.autoreverses = NO;
     opacityInAnimation.toValue = [NSNumber numberWithFloat:1.0];
-    opacityInAnimation.duration = 0.3f;
-    opacityInAnimation.beginTime = 0.3f;
+    opacityInAnimation.duration = 0.2f;
+    opacityInAnimation.beginTime = 0.2f;
     opacityInAnimation.removedOnCompletion = NO;
     opacityInAnimation.fillMode = kCAFillModeForwards;
     opacityInAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
     
     CAAnimationGroup* slideGroup = [[CAAnimationGroup alloc] init];
-    slideGroup.duration = 0.6f;
+    slideGroup.duration = 0.4f;
     slideGroup.animations = @[slideOutAnimation, opacityOutAnimation, opacityInAnimation, slideInAnimation];
     
     [self.promptLabel.layer addAnimation:slideGroup forKey:@"slideAnimation"];

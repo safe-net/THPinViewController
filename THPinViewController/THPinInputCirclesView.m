@@ -117,7 +117,7 @@ static const CGFloat THInitialShakeAmplitude = 40.0f;
 
 - (void)performShake
 {
-    [UIView animateWithDuration:0.08f animations:^ {
+    [UIView animateWithDuration:0.07f animations:^ {
         self.transform = CGAffineTransformMakeTranslation(self.shakeDirection * self.shakeAmplitude, 0.0f);
     } completion:^(BOOL finished) {
         if (self.numShakes < THTotalNumberOfShakes)
