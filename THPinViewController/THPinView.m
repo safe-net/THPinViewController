@@ -210,7 +210,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         return;
     }
     _viewControllerType = viewControllerType;
-    if (self.viewControllerType == THPinViewControllerTypeCreatePin) {
+    if (self.viewControllerType != THPinViewControllerTypeStandard) {
         NSAssert(self.promptChooseTitle && self.promptVerifyTitle, @"THPinView needs promptChooseTitle and promptVerifyTitle for THPinViewControllerTypeCreatePin");
     }
 }
@@ -270,8 +270,8 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         return;
     }
     
-    if (self.viewControllerType == THPinViewControllerTypeCreatePin) {
-        if(!self.inputVerified) {
+    if (self.viewControllerType == THPinViewControllerTypeCreatePin || self.viewControllerType == THPinViewControllerTypeChangePin) {
+        if(self.viewControllerType == THPinViewControllerTypeChangePin && !self.inputVerified) {
             self.creatingPin = nil;
             if ([self.delegate pinView:self isPinValid:self.input])
             {

@@ -13,7 +13,8 @@
 
 typedef NS_ENUM(NSInteger, THPinViewControllerType) {
     THPinViewControllerTypeStandard,
-    THPinViewControllerTypeCreatePin
+    THPinViewControllerTypeCreatePin,
+    THPinViewControllerTypeChangePin
 };
 
 @protocol THPinViewDelegate <NSObject>
