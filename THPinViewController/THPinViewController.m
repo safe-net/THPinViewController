@@ -37,14 +37,7 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    
-    if (self.translucentBackground) {
-        self.view.backgroundColor = [UIColor clearColor];
-        [self addBlurView];
-    } else {
-        self.view.backgroundColor = self.backgroundColor;
-    }
-    
+
     self.pinView = [[THPinView alloc] initWithDelegate:self];
     self.pinView.backgroundColor = self.view.backgroundColor;
     self.pinView.promptTitle = self.promptTitle;
@@ -55,6 +48,13 @@
     self.pinView.disableCancel = self.disableCancel;
     self.pinView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.pinView];
+
+    if (self.translucentBackground) {
+        [self addBlurView];
+    } else {
+        self.view.backgroundColor = self.backgroundColor;
+    }
+
     // center pin view
     [self.view addConstraint:[NSLayoutConstraint constraintWithItem:self.pinView attribute:NSLayoutAttributeCenterX
                                                           relatedBy:NSLayoutRelationEqual
@@ -98,12 +98,8 @@
     }
     _translucentBackground = translucentBackground;
     if (self.translucentBackground) {
-        self.view.backgroundColor = [UIColor clearColor];
-        self.pinView.backgroundColor = [UIColor clearColor];
         [self addBlurView];
     } else {
-        self.view.backgroundColor = self.backgroundColor;
-        self.pinView.backgroundColor = self.backgroundColor;
         [self removeBlurView];
     }
 }
@@ -176,35 +172,54 @@
 
 - (void)addBlurView
 {
-    self.blurView = [[UIImageView alloc] initWithImage:[self blurredContentImage]];
-    self.blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view insertSubview:self.blurView belowSubview:self.pinView];
-    NSDictionary *views = @{ @"blurView" : self.blurView };
-    NSMutableArray *constraints =
-    [NSMutableArray arrayWithArray:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[blurView]|"
-                                                                           options:0 metrics:nil views:views]];
-    [constraints addObjectsFromArray:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[blurView]|"
-                                                                             options:0 metrics:nil views:views]];
-    self.blurViewContraints = constraints;
-    [self.view addConstraints:self.blurViewContraints];
+    if(!self.blurView) {
+        self.view.backgroundColor = [UIColor clearColor];
+        self.pinView.backgroundColor = [UIColor clearColor];
+        self.blurView = [[UIImageView alloc] initWithImage:[self blurredContentImage]];
+        self.blurView.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.view insertSubview:self.blurView belowSubview:self.pinView];
+        NSDictionary *views = @{ @"blurView" : self.blurView };
+        NSMutableArray *constraints =
+                [NSMutableArray arrayWithArray:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[blurView]|"
+                                                                                       options:0 metrics:nil views:views]];
+        [constraints addObjectsFromArray:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[blurView]|"
+                                                                                 options:0 metrics:nil views:views]];
+        self.blurViewContraints = constraints;
+        [self.view addConstraints:self.blurViewContraints];
+    }
 }
 
 - (void)removeBlurView
 {
+    self.view.backgroundColor = self.backgroundColor;
+    self.pinView.backgroundColor = self.backgroundColor;
     [self.blurView removeFromSuperview];
     self.blurView = nil;
     [self.view removeConstraints:self.blurViewContraints];
     self.blurViewContraints = nil;
 }
 
+- (UIView *) findContentView {
+    NSArray *windows = [UIApplication sharedApplication].windows;
+    for (UIWindow *window in windows) {
+        UIView *view = [window viewWithTag:THPinViewControllerContentViewTag];
+        if(view) {
+            return view;
+        }
+    }
+    return nil;
+}
+
 - (UIImage*)blurredContentImage
 {
-    UIView *contentView = [[[UIApplication sharedApplication] keyWindow] viewWithTag:THPinViewControllerContentViewTag];
+
+    UIView *contentView = [self findContentView];
+
     if (! contentView) {
         return nil;
     }
     UIGraphicsBeginImageContext(self.view.bounds.size);
-    [contentView drawViewHierarchyInRect:self.view.bounds afterScreenUpdates:NO];
+    [contentView drawViewHierarchyInRect:self.view.bounds afterScreenUpdates:YES];
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     return [image applyBlurWithRadius:20.0f tintColor:[UIColor colorWithWhite:1.0f alpha:0.25f]
