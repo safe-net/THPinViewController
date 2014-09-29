@@ -48,6 +48,7 @@
     RAC(self.pinView, promptColor) = RACObserve(self, promptColor);
     RAC(self.pinView, hideLetters) = RACObserve(self, hideLetters);
     RAC(self.pinView, disableCancel) = RACObserve(self, disableCancel);
+    RAC(self.pinView, viewControllerType) = RACObserve(self, viewControllerType);
     self.pinView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.pinView];
 
