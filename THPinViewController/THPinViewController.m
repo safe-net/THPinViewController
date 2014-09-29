@@ -82,6 +82,13 @@
                                                          multiplier:1.0f constant:pinViewYOffset]];
 }
 
+- (NSUInteger)supportedInterfaceOrientations {
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
+        return (UIInterfaceOrientationMaskPortrait);
+    else
+        return (UIInterfaceOrientationMaskAll);
+}
+
 #pragma mark - Blur
 
 - (void)translucencyChanged:(BOOL)translucent {
