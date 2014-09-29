@@ -10,8 +10,15 @@
 #import "THPinInputCirclesView.h"
 #import "THPinNumPadView.h"
 #import "THPinNumButton.h"
+#import <ReactiveCocoa/ReactiveCocoa.h>
 
 typedef void (^THPinAnimationCompletionBlock)(void);
+
+typedef NS_ENUM(NSInteger, THPinViewControllerStep) {
+    THPinViewControllerStepVerifyCurrentPin,
+    THPinViewControllerStepEnterNewPin,
+    THPinViewControllerStepVerifyNewPin
+};
 
 @interface THPinView () <THPinNumPadViewDelegate>
 
@@ -28,6 +35,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 
 @property (nonatomic, assign) BOOL inputVerified;
 @property (nonatomic, strong) NSString *creatingPin;
+@property (nonatomic) THPinViewControllerStep viewControllerStep;
 
 @end
 
@@ -62,6 +70,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         _numPadView = [[THPinNumPadView alloc] initWithDelegate:self];
         _numPadView.translatesAutoresizingMaskIntoConstraints = NO;
         _numPadView.backgroundColor = self.backgroundColor;
+        RAC(_numPadView, backgroundColor) = RACObserve(self, backgroundColor);
         [self addSubview:_numPadView];
         [self addConstraint:[NSLayoutConstraint constraintWithItem:_numPadView attribute:NSLayoutAttributeCenterX
                                                          relatedBy:NSLayoutRelationEqual
@@ -128,6 +137,22 @@ typedef void (^THPinAnimationCompletionBlock)(void);
                                  @"numPadView" : _numPadView,
                                  @"bottomButton" : _bottomButton };
         [self addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:vFormat options:0 metrics:metrics views:views]];
+
+        RAC(self, promptLabel.text) = [RACSignal switch:RACObserve(self, viewControllerStep)
+                                                  cases:@{
+                                                          @(THPinViewControllerStepVerifyCurrentPin): RACObserve(self, promptTitle),
+                                                          @(THPinViewControllerStepEnterNewPin): RACObserve(self, promptChooseTitle),
+                                                          @(THPinViewControllerStepVerifyNewPin): RACObserve(self, promptVerifyTitle)
+                                                  }
+                                                default:RACObserve(self, promptTitle)];
+
+        RAC(self, viewControllerStep) = [RACObserve(self, viewControllerType) map:^id(NSNumber *type) {
+            if (type.integerValue == THPinViewControllerTypeCreatePin) {
+                return @(THPinViewControllerStepEnterNewPin);
+            } else {
+                return @(THPinViewControllerStepVerifyCurrentPin);
+            }
+        }];
     }
     return self;
 }
@@ -144,37 +169,6 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 }
 
 #pragma mark - Properties
-
-- (void)setBackgroundColor:(UIColor *)backgroundColor
-{
-    [super setBackgroundColor:backgroundColor];
-    self.numPadView.backgroundColor = self.backgroundColor;
-}
-
-- (void)setPromptTitle:(NSString *)promptTitle
-{
-    if ([self.promptTitle isEqualToString:promptTitle]) {
-        return;
-    }
-    _promptTitle = [promptTitle copy];
-    self.promptLabel.text = self.promptTitle;
-}
-
-- (void)setPromptChooseTitle:(NSString *)promptChooseTitle
-{
-    if ([self.promptChooseTitle isEqualToString:promptChooseTitle]) {
-        return;
-    }
-    _promptChooseTitle = [promptChooseTitle copy];
-}
-
-- (void)setPromptVerifyTitle:(NSString *)promptVerifyTitle
-{
-    if ([self.promptVerifyTitle isEqualToString:promptVerifyTitle]) {
-        return;
-    }
-    _promptVerifyTitle = [promptVerifyTitle copy];
-}
 
 - (UIColor *)promptColor
 {
@@ -203,16 +197,6 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     }
     _disableCancel = disableCancel;
     [self updateBottomButton];
-}
-
-- (void)setViewControllerType:(THPinViewControllerType)viewControllerType {
-    if (self.viewControllerType == viewControllerType) {
-        return;
-    }
-    _viewControllerType = viewControllerType;
-    if (self.viewControllerType != THPinViewControllerTypeStandard) {
-        NSAssert(self.promptChooseTitle && self.promptVerifyTitle, @"THPinView needs promptChooseTitle and promptVerifyTitle for THPinViewControllerTypeCreatePin");
-    }
 }
 
 #pragma mark - Public
@@ -276,7 +260,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
             if ([self.delegate pinView:self isPinValid:self.input])
             {
                 self.inputVerified = YES;
-                [self slideCirclesAndLabelWithLabel:self.promptChooseTitle forward:YES completion:^{
+                [self slideCirclesAndLabelToStep:THPinViewControllerStepEnterNewPin forward:YES completion:^{
                     [self resetInput];
                 }];
             } else {
@@ -287,7 +271,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
             }
         } else if (self.creatingPin == nil) {
             self.creatingPin = self.input;
-            [self slideCirclesAndLabelWithLabel:self.promptVerifyTitle forward:YES completion:^{
+            [self slideCirclesAndLabelToStep:THPinViewControllerStepVerifyNewPin forward:YES completion:^{
                 [self resetInput];
             }];
         } else if ([self.creatingPin isEqualToString:self.input]) {
@@ -299,7 +283,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
         } else {
             [self.inputCirclesView shakeWithCompletion:^{
                 self.creatingPin = nil;
-                [self slideCirclesAndLabelWithLabel:self.promptChooseTitle forward:NO completion:^{
+                [self slideCirclesAndLabelToStep:THPinViewControllerStepEnterNewPin forward:NO completion:^{
                     [self resetInput];
                 }];
             }];
@@ -326,7 +310,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
 
 #pragma mark - Util
 
-- (void)slideCirclesAndLabelWithLabel:(NSString *)label forward:(BOOL)forward completion:(THPinAnimationCompletionBlock)completion {
+- (void)slideCirclesAndLabelToStep:(THPinViewControllerStep)step forward:(BOOL)forward completion:(THPinAnimationCompletionBlock)completion {
     CABasicAnimation* slideOutAnimation = [CABasicAnimation animationWithKeyPath:@"transform"];
     slideOutAnimation.autoreverses = NO;
     slideOutAnimation.duration = 0.2f;
@@ -348,7 +332,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     
     CABasicAnimation* opacityOutAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
     opacityOutAnimation.autoreverses = NO;
-    opacityOutAnimation.toValue = [NSNumber numberWithFloat:0.0];
+    opacityOutAnimation.toValue = @0.0F;
     opacityOutAnimation.duration = 0.2f;
     opacityOutAnimation.beginTime = 0.0f;
     opacityOutAnimation.removedOnCompletion = NO;
@@ -357,7 +341,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     
     CABasicAnimation* opacityInAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
     opacityInAnimation.autoreverses = NO;
-    opacityInAnimation.toValue = [NSNumber numberWithFloat:1.0];
+    opacityInAnimation.toValue = @1.0F;
     opacityInAnimation.duration = 0.2f;
     opacityInAnimation.beginTime = 0.2f;
     opacityInAnimation.removedOnCompletion = NO;
@@ -371,7 +355,7 @@ typedef void (^THPinAnimationCompletionBlock)(void);
     [self.promptLabel.layer addAnimation:slideGroup forKey:@"slideAnimation"];
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(slideGroup.duration/2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        self.promptLabel.text = label;
+        self.viewControllerStep = step;
     });
     [self.inputCirclesView animateWithAnimation:slideGroup andCompletion:^{
         if (completion) {

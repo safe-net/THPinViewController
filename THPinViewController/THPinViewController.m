@@ -8,6 +8,8 @@
 
 #import "THPinViewController.h"
 #import "UIImage+ImageEffects.h"
+#import <ReactiveCocoa/ReactiveCocoa.h>
+#import "RACEXTScope.h"
 
 @interface THPinViewController () <THPinViewDelegate>
 
@@ -39,21 +41,23 @@
     [super viewDidLoad];
 
     self.pinView = [[THPinView alloc] initWithDelegate:self];
-    self.pinView.backgroundColor = self.view.backgroundColor;
-    self.pinView.promptTitle = self.promptTitle;
-    self.pinView.promptChooseTitle = self.promptChooseTitle;
-    self.pinView.promptVerifyTitle = self.promptVerifyTitle;
-    self.pinView.promptColor = self.promptColor;
-    self.pinView.hideLetters = self.hideLetters;
-    self.pinView.disableCancel = self.disableCancel;
+    
+    RAC(self.pinView, promptTitle) = RACObserve(self, promptTitle);
+    RAC(self.pinView, promptChooseTitle) = RACObserve(self, promptChooseTitle);
+    RAC(self.pinView, promptVerifyTitle) = RACObserve(self, promptVerifyTitle);
+    RAC(self.pinView, promptColor) = RACObserve(self, promptColor);
+    RAC(self.pinView, hideLetters) = RACObserve(self, hideLetters);
+    RAC(self.pinView, disableCancel) = RACObserve(self, disableCancel);
     self.pinView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.pinView];
 
-    if (self.translucentBackground) {
-        [self addBlurView];
-    } else {
-        self.view.backgroundColor = self.backgroundColor;
-    }
+    RACSignal *viewBackgroundColor = [RACSignal if:RACObserve(self, translucentBackground)
+                                               then:[RACSignal return:[UIColor clearColor]]
+                                               else:RACObserve(self, backgroundColor)];
+    RAC(self.view, backgroundColor) = viewBackgroundColor;
+    RAC(self.pinView, backgroundColor) = viewBackgroundColor;
+
+    [self rac_liftSelector:@selector(translucencyChanged:) withSignals:RACObserve(self, translucentBackground).distinctUntilChanged, nil];
 
     // center pin view
     [self.view addConstraint:[NSLayoutConstraint constraintWithItem:self.pinView attribute:NSLayoutAttributeCenterX
@@ -77,104 +81,17 @@
                                                          multiplier:1.0f constant:pinViewYOffset]];
 }
 
-#pragma mark - Properties
-
-- (void)setBackgroundColor:(UIColor *)backgroundColor
-{
-    if ([self.backgroundColor isEqual:backgroundColor]) {
-        return;
-    }
-    _backgroundColor = backgroundColor;
-    if (! self.translucentBackground) {
-        self.view.backgroundColor = self.backgroundColor;
-        self.pinView.backgroundColor = self.backgroundColor;
-    }
-}
-
-- (void)setTranslucentBackground:(BOOL)translucentBackground
-{
-    if (self.translucentBackground == translucentBackground) {
-        return;
-    }
-    _translucentBackground = translucentBackground;
-    if (self.translucentBackground) {
-        [self addBlurView];
-    } else {
-        [self removeBlurView];
-    }
-}
-
-- (void)setPromptTitle:(NSString *)promptTitle
-{
-    if ([self.promptTitle isEqualToString:promptTitle]) {
-        return;
-    }
-    _promptTitle = [promptTitle copy];
-    self.pinView.promptTitle = self.promptTitle;
-}
-
-
-- (void)setPromptChooseTitle:(NSString *)promptChooseTitle
-{
-    if ([self.promptChooseTitle isEqualToString:promptChooseTitle]) {
-        return;
-    }
-    _promptChooseTitle = [promptChooseTitle copy];
-    self.pinView.promptChooseTitle = _promptChooseTitle;
-}
-
-- (void)setPromptVerifyTitle:(NSString *)promptVerifyTitle
-{
-    if ([self.promptVerifyTitle isEqualToString:promptVerifyTitle]) {
-        return;
-    }
-    _promptVerifyTitle = [promptVerifyTitle copy];
-    self.pinView.promptVerifyTitle = self.promptVerifyTitle;
-}
-
-- (void)setPromptColor:(UIColor *)promptColor
-{
-    if ([self.promptColor isEqual:promptColor]) {
-        return;
-    }
-    _promptColor = promptColor;
-    self.pinView.promptColor = self.promptColor;
-}
-
-- (void)setHideLetters:(BOOL)hideLetters
-{
-    if (self.hideLetters == hideLetters) {
-        return;
-    }
-    _hideLetters = hideLetters;
-    self.pinView.hideLetters = self.hideLetters;
-}
-
-- (void)setDisableCancel:(BOOL)disableCancel
-{
-    if (self.disableCancel == disableCancel) {
-        return;
-    }
-    _disableCancel = disableCancel;
-    self.pinView.disableCancel = self.disableCancel;
-}
-
-- (void)setViewControllerType:(THPinViewControllerType)viewControllerType
-{
-    if (self.viewControllerType == viewControllerType) {
-        return;
-    }
-    _viewControllerType = viewControllerType;
-    self.pinView.viewControllerType = self.viewControllerType;
-}
-
 #pragma mark - Blur
 
-- (void)addBlurView
-{
-    if(!self.blurView) {
-        self.view.backgroundColor = [UIColor clearColor];
-        self.pinView.backgroundColor = [UIColor clearColor];
+- (void)translucencyChanged:(BOOL)translucent {
+    if(self.blurView != nil) {
+        [self.blurView removeFromSuperview];
+        self.blurView = nil;
+    }
+    if (self.blurViewContraints != nil) {
+        [self.view removeConstraints:self.blurViewContraints];
+    }
+    if(translucent) {
         self.blurView = [[UIImageView alloc] initWithImage:[self blurredContentImage]];
         self.blurView.translatesAutoresizingMaskIntoConstraints = NO;
         [self.view insertSubview:self.blurView belowSubview:self.pinView];
@@ -189,15 +106,6 @@
     }
 }
 
-- (void)removeBlurView
-{
-    self.view.backgroundColor = self.backgroundColor;
-    self.pinView.backgroundColor = self.backgroundColor;
-    [self.blurView removeFromSuperview];
-    self.blurView = nil;
-    [self.view removeConstraints:self.blurViewContraints];
-    self.blurViewContraints = nil;
-}
 
 - (UIView *) findContentView {
     NSArray *windows = [UIApplication sharedApplication].windows;
